@@ -38,7 +38,7 @@ y = np.extract([(t_full>=t_start) & (t_full<=t_end)], df.iloc[:,1]).astype(np.in
 
 
 
-def test_preds(q,dd,lag,plot):
+def test_preds(q,dd,lag,plot, title_str):
     print('Test Preds function called')
     #q−step ahead prediction
     stride=1
@@ -61,6 +61,7 @@ def test_preds(q,dd,lag,plot):
     if plot:
         y_pred = model.predict(XX)
         # print(tt , y_pred[0])
+        plt.title(title_str)
         plt.scatter(t, y, color='black'); plt.scatter(tt, y_pred, color='red')
         plt.xlabel("time (days)"); plt.ylabel("#bikes")
         plt.legend(["training data","predictions"],loc='upper right')
@@ -69,8 +70,18 @@ def test_preds(q,dd,lag,plot):
         plt.show()
 
 # prediction using short−term trend
+# q = 1 is 5 mins
+# q = 2 is 10 mins
+# q = 12 is 60 mins
 plot=True
-test_preds(q=1,dd=1,lag=3,plot=plot)
+test_preds(q=1,dd=1,lag=3,plot=plot, title_str = '5-step ahead (5 mins) : Dame Street')
+test_preds(q=2,dd=1,lag=3,plot=plot, title_str = '5-step ahead (10 mins) : Dame Street')
+test_preds(q=12,dd=1,lag=3,plot=plot, title_str = '5-step ahead (60 mins) : Dame Street')
+
+
+
+
+
 
 #putting it together
 q=10
@@ -100,7 +111,8 @@ model = Ridge(fit_intercept=False).fit(XX[train], yy[train])
 print(model.intercept_, model.coef_)
 if plot:
     y_pred = model.predict(XX)
-    plt.scatter(t, y, color='black'); plt.scatter(tt, y_pred, color='blue')
+    plt.title('Putting it Together Method : Dame Street')
+    plt.scatter(t, y, color='red'); plt.scatter(tt, y_pred, color='blue')
     plt.xlabel("time (days)"); plt.ylabel("#bikes")
     plt.legend(["training data","predictions"],loc='upper right')
     day=math.floor(24*12/dt) # number of samples per day

@@ -12,9 +12,9 @@ print (dame_street_df)
 
 pd.DataFrame.to_csv(dame_street_df,'Datasets/Dame_Street_Data.csv')
 
-pearse_street_df = df_time[df['NAME'].str.contains('HERBERT')]
+pearse_street_df = df_time[df['NAME'].str.contains('PEARSE')]
 print (pearse_street_df)
 
-pd.DataFrame.to_csv(pearse_street_df,'Datasets/Herbert_Place_Data.csv')
+pd.DataFrame.to_csv(pearse_street_df,'Datasets/Pearse_Street_Data.csv')
 
 print ("Done")
