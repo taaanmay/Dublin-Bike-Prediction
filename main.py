@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 
 plt.rc('font', size=18); plt.rcParams['figure.constrained_layout.use'] = True
 # read data. column 1 is date/time, col 6 is #bikes
-df = pd.read_csv("Datasets/Dame_Street_Data.csv", usecols = [2,7], parse_dates=[1])
+df = pd.read_csv("Datasets/Rathdown_House_Data.csv", usecols = [2,7], parse_dates=[1])
 # print(df.head())
 # 3rd Feb 2020 is a monday, 10th is following monday
 start=pd.to_datetime("01−01−2020",format='%d−%m−%Y')
@@ -69,52 +69,55 @@ def test_preds(q,dd,lag,plot, title_str):
         # plt.xlim(((lag*dd+q)/day,(lag*dd+q)/day+2))
         plt.show()
 
+
+def put_it_together():
+    #putting it together
+    q=10
+    lag=3; stride=1
+    w=math.floor(7*24*12/dt) # number of samples per week
+    len = y.size - w - lag*w - q
+
+    XX=y[q:q+len:stride]
+    for i in range(1,lag):
+        X=y[i*w+q:i*w+q+len:stride]
+        XX=np.column_stack((XX,X))
+    d=math.floor(24*12/dt) # number of samples per day
+    for i in range(0,lag):
+        X=y[i*d+q:i*d+q+len:stride]
+        XX=np.column_stack((XX,X))
+    for i in range(0,lag):
+        X=y[i:i+len:stride]
+        XX=np.column_stack((XX,X))
+    yy=y[lag*w+w+q:lag*w+w+q+len:stride]
+    tt=t[lag*w+w+q:lag*w+w+q+len:stride]
+
+    from sklearn.model_selection import train_test_split
+    train, test = train_test_split(np.arange(0,yy.size),test_size=0.2)
+    #train = np.arange(0,yy.size)
+    from sklearn.linear_model import Ridge
+    model = Ridge(fit_intercept=False).fit(XX[train], yy[train])
+    print(model.intercept_, model.coef_)
+    if plot:
+        y_pred = model.predict(XX)
+        plt.title('Putting it Together Method : Rathdown House')
+        plt.scatter(t, y, color='red'); plt.scatter(tt, y_pred, color='blue')
+        plt.xlabel("time (days)"); plt.ylabel("#bikes")
+        plt.legend(["training data","predictions"],loc='upper right')
+        day=math.floor(24*12/dt) # number of samples per day
+        # plt.xlim((4*7,4*7+4))
+        plt.show()
+
+
 # prediction using short−term trend
 # q = 1 is 5 mins
 # q = 2 is 10 mins
 # q = 12 is 60 mins
 plot=True
-test_preds(q=1,dd=1,lag=3,plot=plot, title_str = '5-step ahead (5 mins) : Dame Street')
-test_preds(q=2,dd=1,lag=3,plot=plot, title_str = '5-step ahead (10 mins) : Dame Street')
-test_preds(q=12,dd=1,lag=3,plot=plot, title_str = '5-step ahead (60 mins) : Dame Street')
+test_preds(q=1,dd=1,lag=3,plot=plot, title_str = '5-step ahead (5 mins) : Rathdown House')
+test_preds(q=2,dd=1,lag=3,plot=plot, title_str = '5-step ahead (10 mins) : Rathdown House')
+test_preds(q=12,dd=1,lag=3,plot=plot, title_str = '5-step ahead (60 mins) : Rathdown House')
 
 
 
+put_it_together()
 
-
-
-#putting it together
-q=10
-lag=3; stride=1
-w=math.floor(7*24*12/dt) # number of samples per week
-len = y.size - w - lag*w - q
-
-XX=y[q:q+len:stride]
-for i in range(1,lag):
-    X=y[i*w+q:i*w+q+len:stride]
-    XX=np.column_stack((XX,X))
-d=math.floor(24*12/dt) # number of samples per day
-for i in range(0,lag):
-    X=y[i*d+q:i*d+q+len:stride]
-    XX=np.column_stack((XX,X))
-for i in range(0,lag):
-    X=y[i:i+len:stride]
-    XX=np.column_stack((XX,X))
-yy=y[lag*w+w+q:lag*w+w+q+len:stride]
-tt=t[lag*w+w+q:lag*w+w+q+len:stride]
-
-from sklearn.model_selection import train_test_split
-train, test = train_test_split(np.arange(0,yy.size),test_size=0.2)
-#train = np.arange(0,yy.size)
-from sklearn.linear_model import Ridge
-model = Ridge(fit_intercept=False).fit(XX[train], yy[train])
-print(model.intercept_, model.coef_)
-if plot:
-    y_pred = model.predict(XX)
-    plt.title('Putting it Together Method : Dame Street')
-    plt.scatter(t, y, color='red'); plt.scatter(tt, y_pred, color='blue')
-    plt.xlabel("time (days)"); plt.ylabel("#bikes")
-    plt.legend(["training data","predictions"],loc='upper right')
-    day=math.floor(24*12/dt) # number of samples per day
-    # plt.xlim((4*7,4*7+4))
-    plt.show()
