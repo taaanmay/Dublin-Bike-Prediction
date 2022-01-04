@@ -1,3 +1,4 @@
+from matplotlib import colors
 import pandas as pd
 import numpy as np
 import math, sys
@@ -6,13 +7,14 @@ from sklearn.model_selection import train_test_split
 from sklearn.linear_model import Ridge, Lasso
 from sklearn.tree import DecisionTreeRegressor
 from sklearn.dummy import DummyClassifier
-    
+from sklearn.metrics import mean_squared_error
+from sklearn.model_selection import KFold    
 
 
 plt.rc('font', size=18); plt.rcParams['figure.constrained_layout.use'] = True
 # read data. column 1 is date/time, col 6 is #bikes
-# df = pd.read_csv("Datasets/Avondale_Street_Data.csv", usecols = [2,7], parse_dates=[1])
-df = pd.read_csv("Datasets/Dame_Street_Data.csv", usecols = [2,7], parse_dates=[1])
+df = pd.read_csv("Datasets/Avondale_Street_Data.csv", usecols = [2,7], parse_dates=[1])
+# df = pd.read_csv("Datasets/Dame_Street_Data.csv", usecols = [2,7], parse_dates=[1])
 print("DF.HEAD ->")
 print(df.head())
 
@@ -51,6 +53,8 @@ t=(t-t[0])/60/60/24 # convert timestamp to days
 
 y = np.extract([(t_full>=t_start) & (t_full<=t_end)], df.iloc[:,1]).astype(np.int64)
 
+final_compate_std = []
+final_compate_mean = []
 
 
 
@@ -124,97 +128,154 @@ def put_it_together():
         # plt.xlim((4*7,4*7+4))
         plt.show()
 
+def cross_validation_for_C(XX, yy, title):
+    Cs = [0.00001, 0.00005, 0.0001, 0.0005, 0.001,0.005, 0.01,0.05, 0.1, 0.5, 1, 5, 10, 50, 100]
+
+    ridge_means=[]
+    lasso_means=[]
+    ridge_stds=[]
+    lasso_stds=[]
+    
+    for c_i in Cs:
+        ridge_error_mse=[]
+        lasso_error_mse=[]
+
+
+        kf = KFold(n_splits=5)
+        
+        for train, test in kf.split(yy):
+            alp = (1/(2*c_i)) 
+            
+            # Lasso
+            lasso_model = Lasso(fit_intercept=False, alpha=alp)
+            lasso_model.fit(XX[train], yy[train]) 
+            lasso_y_pred = lasso_model.predict(XX)
+            lasso_error_mse.append(mean_squared_error(yy,lasso_y_pred))
+    
+            
+            # Ridge
+            ridge_model = Ridge(fit_intercept=False, alpha=alp)
+            ridge_model.fit(XX[train], yy[train])
+            ridge_y_pred = ridge_model.predict(XX)
+            ridge_error_mse.append(mean_squared_error(yy,ridge_y_pred))
+            
+        ridge_means.append(np.array(ridge_error_mse).mean())
+        lasso_means.append(np.array(lasso_error_mse).mean())
+
+        ridge_stds.append(np.array(ridge_error_mse).std())
+        lasso_stds.append(np.array(lasso_error_mse).std())
+
+    
+
+    plt.errorbar(Cs,lasso_means,yerr=lasso_stds)
+    plt.xlabel('Ci'); 
+    plt.ylabel('MSE (Lasso) '+title)
+    plt.xlim((0,1.0))
+    plt.show()
+
+
+    plt.errorbar(Cs,ridge_means,yerr=ridge_stds)
+    plt.xlabel('Ci'); 
+    plt.ylabel('MSE (Ridge) '+title)
+    plt.show()
+
+    
+
 
 def apply_models(q,dt,lag,y,t,c_value,title, plot):
     print(title)
     #q−step ahead prediction
     stride=1
-    #set up putting-together features
-    # features: [y^(k-3*w), y^(k-2*w), y^(k-1*w),y^(k-3*d), y^(k-2*d), y^(k-1*d), y^(k-3-q), y^(k-2-q), y^(k-1-q)]
+    
+    
     w=math.floor(7*24*60*60/dt) # number of samples per week
     len = y.size-w-lag*w-q
     XX=y[q:q+len:stride]
     # print('HERE\n\n\n')
     # print(XX)
     
-    for i in range(1,lag): # set up [y^(k-3*w), y^(k-2*w), y^(k-1*w)] when lag=3
+
+    # Features =  [y^(k-3*w), y^(k-2*w), y^(k-1*w),y^(k-3*d), y^(k-2*d), y^(k-1*d), y^(k-3-q), y^(k-2-q), y^(k-1-q)]
+    for i in range(1,lag): 
         X=y[i*w+q:i*w+q+len:stride] 
-        XX=np.column_stack((XX,X)) #add weekly feature to XX
-    d=math.floor(24*60*60/dt) # number of samples per day
+        XX=np.column_stack((XX,X)) 
+    d=math.floor(24*60*60/dt) 
     
-    for i in range(0,lag): # set up [y^(k-3*d), y^(k-2*d), y^(k-1*d)] when lag=3
+    for i in range(0,lag): 
         X=y[i*d+q:i*d+q+len:stride]
-        XX=np.column_stack((XX,X)) #add daily feature to XX
+        XX=np.column_stack((XX,X)) 
     
-    for i in range(0,lag): # set up [y^(k-3-q), y^(k-2-q), y^(k-1-q)] when lag=3
+    for i in range(0,lag): 
         X=y[i:i+len:stride]
-        XX=np.column_stack((XX,X)) #add short-term feature to XX
+        XX=np.column_stack((XX,X)) 
     
     
-    yy=y[lag*w+w+q:lag*w+w+q+len:stride] # set up yy for putting-together feature
-    tt=t[lag*w+w+q:lag*w+w+q+len:stride] # set up tt for putting-together feature
+    yy=y[lag*w+w+q:lag*w+w+q+len:stride] 
+    tt=t[lag*w+w+q:lag*w+w+q+len:stride] 
 
     
     train, test = train_test_split(np.arange(0,yy.size),test_size=0.2)
 
+    # # UNCOMMENT BELOW LINE FOR CROSS VALIDATION OF values of C
+    # cross_validation_for_C(XX, yy, 'Cross Validation for C')
+
+    ai = (1/(2*0.001)) 
+    # Ridge Model
+    ridge_model = Ridge(fit_intercept=False, alpha=ai).fit(XX[train], yy[train])
     
     ai = (1/(2*c_value)) 
-    ridge_model = Ridge(fit_intercept=False, alpha=ai).fit(XX[train], yy[train])
+    # Lasso Model
     lasso_model = Lasso(fit_intercept=False, alpha=ai).fit(XX[train], yy[train]) 
    
    
-    # NEW ADDITION
+    # Decision Tree
     decision_tree_model =  DecisionTreeRegressor()
     decision_tree_model.fit(XX[train], yy[train])
-
+    
     
 
-    #Baseline model
-    dummy_clf = DummyClassifier(strategy="most_frequent")
-    dummy_clf.fit(XX[train], yy[train])
+    # Dummy Regressor
+    dummy_reg = DummyClassifier(strategy="most_frequent")
+    dummy_reg.fit(XX[train], yy[train])
     
-    print("\n")
-    print("the value of each parameters in feature")
-    print(ridge_model.intercept_, ridge_model.coef_)
-    print("\n")
 
-    #preditions by each model
-    y_pred_ridge = ridge_model.predict(XX)
-    y_pred_lasso = lasso_model.predict(XX)
+    # print("Intercepts")
+    # print(ridge_model.intercept_, ridge_model.coef_)
+    # print(lasso_model.intercept_, lasso_model.coef_)
+    
 
-    y_pred_decision_tree = decision_tree_model.predict(XX)
-    y_pred__dummy = dummy_clf.predict(XX)
-    #evaluation of the results, using mean square error
-    from sklearn.metrics import mean_squared_error
-    print("\n")
+    
+    # Predict
+    ridge_y_pred = ridge_model.predict(XX)
+    lasso_y_pred = lasso_model.predict(XX)
+    decision_tree_y_pred = decision_tree_model.predict(XX)
+    baseline_y_pred = dummy_reg.predict(XX)
+
+    # la_error.append(metrics.mean_squared_error(yy, lasso_y_pred))
+
+    # Use MSE
+    
     print(f"Results for {title}")
 
-    from sklearn.metrics import accuracy_score
-    # accuracy = accuracy_score(yy, y_pred_ridge)
-    # print('accuracy of ridge = %f' % (accuracy))
 
-    # accuracy = accuracy_score(yy, y_pred_lasso)
-    # print('accuracy of lasso = %f' % (accuracy))
-
-    accuracy = accuracy_score(yy, y_pred__dummy)
-    print('accuracy of dummy = %f' % (accuracy))
-
-    # score = decision_tree_model.score(yy[train], y_pred__dummy)
-    # accuracy = accuracy_score(yy, y_pred_decision_tree)
+    # score = decision_tree_model.score(yy[train], baseline_y_pred)
+    # accuracy = accuracy_score(yy, decision_tree_y_pred)
     # print('accuracy of decision tree = %f' % (score))
 
 
-    print(f"MSE (ridge model) {(mean_squared_error(yy,y_pred_ridge))}")
-    print(f"MSE (lasso model) {(mean_squared_error(yy,y_pred_lasso))}")
-    print(f"MSE (decision tree model) {(mean_squared_error(yy,y_pred_decision_tree))}")
-    print(f"MSE (baseline model) {(mean_squared_error(yy,y_pred__dummy))}")
+    print(f"MSE (ridge model) {(mean_squared_error(yy,ridge_y_pred))}")
+    print(f"MSE (lasso model) {(mean_squared_error(yy,lasso_y_pred))}")
+    print(f"MSE (decision tree model) {(mean_squared_error(yy,decision_tree_y_pred))}")
+    print(f"MSE (baseline model) {(mean_squared_error(yy,baseline_y_pred))}")
     print("\n")
+
+    
 
     if plot is True:
         # Plot Ridge Prediction
         plt.rcParams["figure.figsize"] = (13, 4)
         plt.scatter(t, y, color='black'); 
-        plt.scatter(tt, y_pred_ridge, color='blue')
+        plt.scatter(tt, ridge_y_pred, color='blue')
         plt.ylabel("No. of bikes")
         plt.xlabel("Time in days)"); 
         
@@ -227,7 +288,7 @@ def apply_models(q,dt,lag,y,t,c_value,title, plot):
         # Polt Lasso Predictions
         plt.rcParams["figure.figsize"] = (13, 4)
         plt.scatter(t, y, color='black'); 
-        plt.scatter(tt, y_pred_lasso, color='yellow', marker='<')
+        plt.scatter(tt, lasso_y_pred, color='yellow', marker='<')
         plt.ylabel("No. of bikes")
         plt.xlabel("Time in days)"); 
         
@@ -240,7 +301,7 @@ def apply_models(q,dt,lag,y,t,c_value,title, plot):
         # Plot Decision Tree Predictions
         plt.rcParams["figure.figsize"] = (13, 4)
         plt.scatter(t, y, color='black'); 
-        plt.scatter(tt,y_pred_decision_tree, color='green', marker='x')
+        plt.scatter(tt,decision_tree_y_pred, color='green', marker='x')
         plt.ylabel("No. of bikes")
         plt.xlabel("Time in days)"); 
         
@@ -250,12 +311,6 @@ def apply_models(q,dt,lag,y,t,c_value,title, plot):
         plt.savefig('Final Plots/'+title+' Decision Tree.png')
         plt.show()
         
-        # # To plot all the predictions on the same graph, uncomment this
-        # plt.xlabel("time (days)"); 
-        # plt.ylabel("#bikes")
-        # plt.legend(["training data","ridge_predictions", "lasso_predictions", "decision_trees_predictions"],loc='upper left')
-        # plt.title(title)
-        # plt.show()
 
 
 
@@ -275,9 +330,9 @@ plot=True
 
 
 # prediction using short−term trend
-stand_name = 'Dame Street'
+# stand_name = 'Dame Street'
+stand_name = 'Avondale_Street_Data'
 
-# stand_name = 'Avondale_Street_Data'
 apply_models(q=2,dt=dt,lag=3,y=y, t=t, c_value=0.5,title= "Prediction for no. of bikes at " +stand_name + " in 10 mins", plot=True)
 
 # prediction using short−term trend
@@ -288,64 +343,3 @@ apply_models(q=6,dt=dt,lag=3,y=y,t=t, c_value=0.5,title= "Prediction for no. of 
 # features: [y^(k-3-q), y^(k-2-q), y^(k-1-q)]
 apply_models(q=12,dt=dt,lag=3,y=y, t=t, c_value=0.5,title= "Prediction for no. of bikes at " +stand_name + " in 1 hour", plot=True)
 
-
-
-#                   TIME AVAILABLE BIKES
-# 0  2020-01-01 06:25:02              15
-# 1  2020-01-01 06:30:02              15
-# 2  2020-01-01 06:35:02              15
-# 3  2020-01-01 06:40:03              15
-# 4  2020-01-01 06:45:02              15
-# data sampling interval is 300 secs
-# Prediction for no. of bikes at Dame Street in 10 mins
-
-
-# the value of each parameters in feature
-# 0.0 [-0.00237841  0.51347205  0.37716833 -0.00237841  0.27792848 -0.08224472
-#   0.00108212 -0.00403457 -0.00237841]
-
-
-
-
-# The evaluation of the results
-# accuracy of dummy = 0.143424
-# square error of ridge model 19.747978 
-# square error of lasso model 19.857163 
-# square error of decision tree model 1.861937 
-# square error of baseline model 76.504957 
-
-
-# Prediction for no. of bikes at Dame Street in 30 mins
-
-
-# the value of each parameters in feature
-# 0.0 [-0.01192638  0.54639528  0.35230897 -0.01192638  0.26792422 -0.08026728
-#   0.06282058 -0.08704942  0.0293456 ]
-
-
-
-
-# The evaluation of the results
-# accuracy of dummy = 0.143804
-# square error of ridge model 19.787076 
-# square error of lasso model 19.927744 
-# square error of decision tree model 1.531331 
-# square error of baseline model 76.525514 
-
-
-# Prediction for no. of bikes at Dame Street in 1 hour
-
-
-# the value of each parameters in feature
-# 0.0 [ 0.01432902  0.54699722  0.35288374  0.01432902  0.26382408 -0.05893043
-#  -0.1109462   0.1668689  -0.10965035]
-
-
-
-
-# The evaluation of the results
-# accuracy of dummy = 0.144378
-# square error of ridge model 19.830361 
-# square error of lasso model 19.994912 
-# square error of decision tree model 1.556443 
-# square error of baseline model 76.527611 
