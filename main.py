@@ -13,8 +13,8 @@ from sklearn.model_selection import KFold
 
 plt.rc('font', size=18); plt.rcParams['figure.constrained_layout.use'] = True
 # read data. column 1 is date/time, col 6 is #bikes
-df = pd.read_csv("Datasets/Avondale_Street_Data.csv", usecols = [2,7], parse_dates=[1])
-# df = pd.read_csv("Datasets/Dame_Street_Data.csv", usecols = [2,7], parse_dates=[1])
+# df = pd.read_csv("Datasets/Avondale_Street_Data.csv", usecols = [2,7], parse_dates=[1])
+df = pd.read_csv("Datasets/Dame_Street_Data.csv", usecols = [2,7], parse_dates=[1])
 print("DF.HEAD ->")
 print(df.head())
 
@@ -239,9 +239,11 @@ def apply_models(q,dt,lag,y,t,c_value,title, plot):
     dummy_reg.fit(XX[train], yy[train])
     
 
-    # print("Intercepts")
-    # print(ridge_model.intercept_, ridge_model.coef_)
-    # print(lasso_model.intercept_, lasso_model.coef_)
+    print("\n\nIntercept and Coefficient of Ridge ->")
+    print(ridge_model.intercept_, ridge_model.coef_)
+    
+    print("\n\nIntercept and Coefficient of Lasso ->")
+    print(lasso_model.intercept_, lasso_model.coef_)
     
 
     
@@ -329,17 +331,14 @@ plot=True
 
 
 
-# prediction using short−term trend
-# stand_name = 'Dame Street'
-stand_name = 'Avondale_Street_Data'
+
+stand_name = 'Dame Street'
+# stand_name = 'Avondale_Street_Data'
 
 apply_models(q=2,dt=dt,lag=3,y=y, t=t, c_value=0.5,title= "Prediction for no. of bikes at " +stand_name + " in 10 mins", plot=True)
 
-# prediction using short−term trend
-# features: [y^(k-3-q), y^(k-2-q), y^(k-1-q)]
+
 apply_models(q=6,dt=dt,lag=3,y=y,t=t, c_value=0.5,title= "Prediction for no. of bikes at " +stand_name + " in 30 mins", plot=True)
 
-# prediction using short−term trend
-# features: [y^(k-3-q), y^(k-2-q), y^(k-1-q)]
 apply_models(q=12,dt=dt,lag=3,y=y, t=t, c_value=0.5,title= "Prediction for no. of bikes at " +stand_name + " in 1 hour", plot=True)
 
